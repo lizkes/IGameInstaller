@@ -44,6 +44,8 @@ namespace IGameInstaller
             Height = 800;
             MinWidth = 900;
             MinHeight = 600;
+            // 使窗口置顶
+            Topmost = true;
             Topmost = false;
 #if DEBUG
             webView.Source = new Uri("http://localhost:8500/prepare");
