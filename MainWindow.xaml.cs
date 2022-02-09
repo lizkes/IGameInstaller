@@ -2,15 +2,17 @@
 using System.IO;
 using System.Windows;
 using System.Linq;
+using System.Threading.Tasks;
+using System.Threading;
 using System.Reflection;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.WindowsAPICodePack.Dialogs;
+using NLog;
 
 using IGameInstaller.Model;
 using IGameInstaller.Helper;
-using NLog;
-using System.Threading.Tasks;
-using System.Threading;
+using IGameInstaller.Extension;
+
 
 namespace IGameInstaller
 {
@@ -35,8 +37,13 @@ namespace IGameInstaller
             // 启动webview2
             await webView.EnsureCoreWebView2Async(webView2Env);
             // 闪屏消失
-            App.SplashScreen.Close(TimeSpan.FromSeconds(0.1));
-
+            App.SplashScreen.Close(TimeSpan.FromSeconds(0.2));
+            // 丑陋的实现，隐藏闪屏显示时的Webview2窗口
+            this.MoveToCenter(1200, 800);
+            Width = 1200;
+            Height = 800;
+            MinWidth = 900;
+            MinHeight = 600;
 #if DEBUG
             webView.Source = new Uri("http://localhost:8500/prepare");
             //var webDirPath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "web");

@@ -1,4 +1,5 @@
-﻿using Polly;
+﻿using NLog;
+using Polly;
 using System;
 using System.IO;
 using System.Net;
@@ -71,16 +72,20 @@ namespace IGameInstaller.Helper
     public class HttpRetryMessageHandler : DelegatingHandler
     {
         public HttpRetryMessageHandler(HttpClientHandler handler) : base(handler) { }
+        private static readonly Logger logger = LogManager.GetCurrentClassLogger();
 
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
             return Policy.Handle<HttpRequestException>()
-                .Or<TaskCanceledException>()
-                .WaitAndRetryAsync(5, retryAttempt => TimeSpan.FromSeconds(Math.Pow(1.5, retryAttempt)))
-                //.WrapAsync(Policy.TimeoutAsync(8))
-                .ExecuteAsync(() => base.SendAsync(request, cancellationToken));
+                .Or<TimeoutException>()
+                .Or<OperationCanceledException>()
+                .WaitAndRetryAsync(5, retryAttempt => TimeSpan.FromSeconds(Math.Pow(1.5, retryAttempt)), onRetry: (exception, sleepDuration, attemptNumber, context) =>
+                {
+                    logger.Debug($"http请求失败，{sleepDuration}后重试，重试次数：{attemptNumber} / 5");
+                })
+                .ExecuteAsync(() => base.SendAsync(request, new CancellationTokenSource(TimeSpan.FromSeconds(10)).Token));
         }
     }
 }
