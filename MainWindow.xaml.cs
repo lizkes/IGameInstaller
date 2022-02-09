@@ -12,7 +12,7 @@ using NLog;
 using IGameInstaller.Model;
 using IGameInstaller.Helper;
 using IGameInstaller.Extension;
-
+using System.Net.Http;
 
 namespace IGameInstaller
 {
@@ -110,6 +110,13 @@ namespace IGameInstaller
                 }
                 catch (Exception ex)
                 {
+                    if (ex is HttpRequestException)
+                    {
+                        await ProcessException("网络连接出错，请稍后重试", ex);
+                        WindowHelper.EnableWindowCloseButton();
+                        return;
+                    }
+
                     await ProcessException("获取版本信息失败", ex);
                     return;
                 }
@@ -125,6 +132,13 @@ namespace IGameInstaller
                 }
                 catch (Exception ex)
                 {
+                    if (ex is HttpRequestException)
+                    {
+                        await ProcessException("网络连接出错，请稍后重试", ex);
+                        WindowHelper.EnableWindowCloseButton();
+                        return;
+                    }
+
                     await ProcessException("程序更新失败", ex);
                     return;
                 }
@@ -138,6 +152,13 @@ namespace IGameInstaller
                 } 
                 catch (Exception ex)
                 {
+                    if (ex is HttpRequestException)
+                    {
+                        await ProcessException("网络连接出错，请稍后重试", ex);
+                        WindowHelper.EnableWindowCloseButton();
+                        return;
+                    }
+
                     await ProcessException("获取资源安装配置失败", ex);
                     return;
                 }
@@ -235,6 +256,13 @@ namespace IGameInstaller
                             WindowHelper.EnableWindowCloseButton();
                             return;
                         }
+
+                        if (ex is HttpRequestException)
+                        {
+                            await ProcessException("网络连接出错，请稍后重试", ex);
+                            WindowHelper.EnableWindowCloseButton();
+                            return;
+                        }
                     }
                     await ProcessException("下载引擎错误", ae);
                     WindowHelper.EnableWindowCloseButton();
@@ -253,7 +281,6 @@ namespace IGameInstaller
                     {
                         WebSendMessage.SendSetProgress("正在准备安装必要的运行环境...", "", -1);
                         installCancelSource = new CancellationTokenSource();
-                        //await InstallHelper.InstallDependsAsync(new Depend[] { Depend.VC2005, Depend.VC2008, Depend.VC2010, Depend.VC2012, Depend.VC2013, Depend.VC2015, Depend.VC2017, Depend.VC2015to2022, Depend.ParadoxLauncher, Depend.ParadoxLauncherCrack, Depend.DirectX9 });
                         await InstallHelper.InstallDependsAsync(App.ResourceInstallInfo.RequireDepends, installCancelSource.Token);
                     }
                 }
@@ -263,6 +290,13 @@ namespace IGameInstaller
                     {
                         if (ex is TaskCanceledException)
                         {
+                            WindowHelper.EnableWindowCloseButton();
+                            return;
+                        }
+
+                        if (ex is HttpRequestException)
+                        {
+                            await ProcessException("网络连接出错，请稍后重试", ex);
                             WindowHelper.EnableWindowCloseButton();
                             return;
                         }

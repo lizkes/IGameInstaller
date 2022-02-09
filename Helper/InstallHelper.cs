@@ -45,7 +45,7 @@ namespace IGameInstaller.Helper
                     }
 
                     // Converts the unix forward slashes in the filenames to windows backslashes
-                    entryName = tarEntry.Name.Replace('/', Path.DirectorySeparatorChar);
+                    entryName = entryName.Replace('/', Path.DirectorySeparatorChar);
 
                     // Remove any root e.g. '\' because a PathRooted filename defeats Path.Combine
                     if (Path.IsPathRooted(entryName))
@@ -94,7 +94,7 @@ namespace IGameInstaller.Helper
                     }
 
                     // Converts the unix forward slashes in the filenames to windows backslashes
-                    entryName = tarEntry.Name.Replace('/', Path.DirectorySeparatorChar);
+                    entryName = entryName.Replace('/', Path.DirectorySeparatorChar);
 
                     // Remove any root e.g. '\' because a PathRooted filename defeats Path.Combine
                     if (Path.IsPathRooted(entryName))
