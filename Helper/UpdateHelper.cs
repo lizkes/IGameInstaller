@@ -1,11 +1,11 @@
-﻿using IGameInstaller.Model;
-using SharpCompress.Common;
-using SharpCompress.Readers;
-using SharpCompress.Readers.Tar;
+﻿using ICSharpCode.SharpZipLib.Tar;
+using IGameInstaller.Model;
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Reflection;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -23,19 +23,42 @@ namespace IGameInstaller.Helper
                 using var tzstStream = File.OpenRead(tzstPath);
                 using var hookStream = new HookStream(tzstStream, fileSize, progress, new CancellationToken(false));
                 using var zstdStream = new DecompressionStream(hookStream);
-                using var tarReader = TarReader.Open(zstdStream);
-
-                while (tarReader.MoveToNextEntry())
+                using var tarStream = new TarInputStream(zstdStream, Encoding.UTF8);
+                TarEntry tarEntry;
+                var sw = Stopwatch.StartNew();
+                while ((tarEntry = tarStream.GetNextEntry()) != null)
                 {
-                    if (!tarReader.Entry.IsDirectory)
+                    if (tarEntry.IsDirectory)
+                        continue;
+                    string entryName = tarEntry.Name;
+                    if (entryName.StartsWith("./"))
                     {
-                         progress.Report(($"正在解压缩更新文件：{tarReader.Entry.Key}", "keep", -2));
-                        tarReader.WriteEntryToDirectory(destDirPath, new ExtractionOptions()
-                        {
-                            ExtractFullPath = true,
-                            Overwrite = true
-                        });
+                        entryName = entryName.Substring(2);
                     }
+                    // Converts the unix forward slashes in the filenames to windows backslashes
+                    entryName = tarEntry.Name.Replace('/', Path.DirectorySeparatorChar);
+
+                    // Remove any root e.g. '\' because a PathRooted filename defeats Path.Combine
+                    if (Path.IsPathRooted(entryName))
+                        entryName = entryName.Substring(Path.GetPathRoot(entryName).Length);
+
+                    // 定时上报
+                    if (sw.ElapsedMilliseconds > 200)
+                    {
+                        progress.Report(($"正在解压缩更新文件：{entryName}", "keep", -2));
+                        sw.Restart();
+                    }
+
+                    // Apply further name transformations here as necessary
+                    string destPath = Path.Combine(destDirPath, entryName);
+                    Directory.CreateDirectory(Path.GetDirectoryName(destPath));
+
+                    var outStream = new FileStream(destPath, FileMode.Create);
+                    tarStream.CopyEntryContents(outStream);
+                    outStream.Dispose();
+
+                    var myDt = DateTime.SpecifyKind(tarEntry.ModTime, DateTimeKind.Utc);
+                    File.SetLastWriteTime(destPath, myDt);
                 }
             }
 

@@ -8,6 +8,7 @@
         mc:Ignorable="d"
         Width="0"
         Height="0"
+        Topmost="True"
         WindowStartupLocation="CenterScreen">
     <DockPanel>
         <wv2:WebView2 Name="webView"/>

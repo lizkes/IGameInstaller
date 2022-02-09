@@ -44,6 +44,7 @@ namespace IGameInstaller
             Height = 800;
             MinWidth = 900;
             MinHeight = 600;
+            Topmost = false;
 #if DEBUG
             webView.Source = new Uri("http://localhost:8500/prepare");
             //var webDirPath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "web");

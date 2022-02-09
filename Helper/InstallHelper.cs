@@ -4,13 +4,14 @@ using System.Threading.Tasks;
 using System.Runtime.InteropServices.ComTypes;
 using System.Threading;
 using System.Net.Http;
+using System.Text;
+
 using ZstdNet;
-using SharpCompress.Readers.Tar;
-using SharpCompress.Readers;
-using SharpCompress.Common;
+using ICSharpCode.SharpZipLib.Tar;
 using CSScriptLibrary;
 
 using IGameInstaller.Model;
+using System.Diagnostics;
 
 namespace IGameInstaller.Helper
 {
@@ -25,49 +26,95 @@ namespace IGameInstaller.Helper
             Directory.CreateDirectory(destDirPath);
             using var downloadStream = resp.Content.ReadAsStreamAsync().Result;
 
-
             if (totalBytes.HasValue)
             {
                 using var hookStream = new HookStream(downloadStream, (long)totalBytes, progress, token);
                 using var zstdStream = new DecompressionStream(hookStream);
-                using var tarReader = TarReader.Open(zstdStream);
-                while (tarReader.MoveToNextEntry())
+                using var tarStream = new TarInputStream(zstdStream, Encoding.UTF8);
+                TarEntry tarEntry;
+                var sw = Stopwatch.StartNew();
+                while ((tarEntry = tarStream.GetNextEntry()) != null)
                 {
-                    if (!tarReader.Entry.IsDirectory)
+                    if (tarEntry.IsDirectory)
+                        continue;
+
+                    string entryName = tarEntry.Name;
+                    if (entryName.StartsWith("./"))
                     {
-                        progress.Report(($"{promptString}：{tarReader.Entry.Key}", "keep", -2));
-                        tarReader.WriteEntryToDirectory(destDirPath, new ExtractionOptions()
-                        {
-                            ExtractFullPath = true,
-                            Overwrite = true
-                        });
-                        if (token.IsCancellationRequested)
-                        {
-                            throw new TaskCanceledException();
-                        }
+                        entryName = entryName.Substring(2);
                     }
+
+                    // Converts the unix forward slashes in the filenames to windows backslashes
+                    entryName = tarEntry.Name.Replace('/', Path.DirectorySeparatorChar);
+
+                    // Remove any root e.g. '\' because a PathRooted filename defeats Path.Combine
+                    if (Path.IsPathRooted(entryName))
+                    entryName = entryName.Substring(Path.GetPathRoot(entryName).Length);
+
+                    // 定时上报
+                    if (sw.ElapsedMilliseconds > 500)
+                    {
+                        progress.Report(($"{promptString}：{entryName}", "keep", -2));
+                        sw.Restart();
+                    }
+
+                    // Apply further name transformations here as necessary
+                    string destPath = Path.Combine(destDirPath, entryName);
+                    Directory.CreateDirectory(Path.GetDirectoryName(destPath));
+
+                    var outStream = new FileStream(destPath, FileMode.Create);
+                    tarStream.CopyEntryContents(outStream);
+                    outStream.Dispose();
+
+                    if (token.IsCancellationRequested)
+                    {
+                        throw new TaskCanceledException();
+                    }
+
+                    var myDt = DateTime.SpecifyKind(tarEntry.ModTime, DateTimeKind.Utc);
+                    File.SetLastWriteTime(destPath, myDt);
                 }
             }
             else
             {
+                progress.Report(($"{promptString}...", "", -1));
                 using var hookStream = new HookStream(downloadStream, token);
                 using var zstdStream = new DecompressionStream(hookStream);
-                using var tarReader = TarReader.Open(zstdStream);
-                progress.Report(($"{promptString}...", "", -1));
-                while (tarReader.MoveToNextEntry())
+                using var tarStream = new TarInputStream(zstdStream, Encoding.UTF8);
+                TarEntry tarEntry;
+                while ((tarEntry = tarStream.GetNextEntry()) != null)
                 {
-                    if (!tarReader.Entry.IsDirectory)
+                    if (tarEntry.IsDirectory)
+                        continue;
+
+                    string entryName = tarEntry.Name;
+                    if (entryName.StartsWith("./"))
                     {
-                        tarReader.WriteEntryToDirectory(destDirPath, new ExtractionOptions()
-                        {
-                            ExtractFullPath = true,
-                            Overwrite = true
-                        });
-                        if (token.IsCancellationRequested)
-                        {
-                            throw new TaskCanceledException();
-                        }
+                        entryName = entryName.Substring(2);
                     }
+
+                    // Converts the unix forward slashes in the filenames to windows backslashes
+                    entryName = tarEntry.Name.Replace('/', Path.DirectorySeparatorChar);
+
+                    // Remove any root e.g. '\' because a PathRooted filename defeats Path.Combine
+                    if (Path.IsPathRooted(entryName))
+                        entryName = entryName.Substring(Path.GetPathRoot(entryName).Length);
+
+                    // Apply further name transformations here as necessary
+                    string destPath = Path.Combine(destDirPath, entryName);
+                    Directory.CreateDirectory(Path.GetDirectoryName(destPath));
+
+                    var outStream = new FileStream(destPath, FileMode.Create);
+                    tarStream.CopyEntryContents(outStream);
+                    outStream.Dispose();
+
+                    if (token.IsCancellationRequested)
+                    {
+                        throw new TaskCanceledException();
+                    }
+
+                    var myDt = DateTime.SpecifyKind(tarEntry.ModTime, DateTimeKind.Utc);
+                    File.SetLastWriteTime(destPath, myDt);
                 }
             }
         }
