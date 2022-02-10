@@ -218,12 +218,18 @@ namespace IGameInstaller
             }
             else if (recvMessage.Type == WebRecvMessageType.StartDownload)
             {
-                WindowHelper.DisableWindowCloseButton();
+                var downloadUrl = recvMessage.Payload;
+                var currentSV = SystemInfoHelper.GetCurrentSystemVersion();
+                if (downloadUrl.Contains("sharepoint.com") && (currentSV == SystemVersion.Win7x32 || currentSV == SystemVersion.Win7x64))
+                {
+                    WebSendMessage.SendSetError("无法访问服务器", "您当前是Windows 7系统\n由于微软已经停止维护，无法使用更安全的TLS加密算法\n因此您无法访问普通下载的服务器\n您可以使用快速下载或者升级为Windows 10系统");
+                    return;
+                }
 
+                WindowHelper.DisableWindowCloseButton();
                 try
                 {
                     WebSendMessage.SendSetProgress("正在初始化下载引擎...", "", -1);
-                    var downloadUrl = recvMessage.Payload;
                     installCancelSource = new CancellationTokenSource();
                     await InstallHelper.InstallMainAsync(downloadUrl, App.InstallConfig.InstallPath, installCancelSource.Token);
                 }

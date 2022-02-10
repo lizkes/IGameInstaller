@@ -8,12 +8,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Text;
 using System.Diagnostics;
-using System.Security.Authentication;
 
 using ZstdNet;
 using ICSharpCode.SharpZipLib.Tar;
 using IGameInstaller.Model;
 using IGameInstaller.IGameException;
+using System.Security.Authentication;
 
 namespace IGameInstaller.Helper
 {
@@ -23,12 +23,12 @@ namespace IGameInstaller.Helper
 
         static HttpClientHelper()
         {
-
             HttpRetryMessageHandler handler = new(
                 new HttpClientHandler{
+
                     AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
                     MaxConnectionsPerServer = 10,
-                    SslProtocols = SslProtocols.Tls13 | SslProtocols.Tls12 | SslProtocols.Tls11 | SslProtocols.Tls,
+                    SslProtocols = SslProtocols.Tls13 | SslProtocols.Tls12,
                     UseProxy = false,
                     Proxy = null,
                 }
