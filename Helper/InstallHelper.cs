@@ -3,127 +3,19 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Runtime.InteropServices.ComTypes;
 using System.Threading;
-using System.Net.Http;
-using System.Text;
 
-using ZstdNet;
-using ICSharpCode.SharpZipLib.Tar;
 using CSScriptLibrary;
-
 using IGameInstaller.Model;
-using System.Diagnostics;
 
 namespace IGameInstaller.Helper
 {
     public class InstallHelper
     {
-        private static void DownloadExtractTask(string downloadUrl, string destDirPath, IProgress<(string, string, int)> progress, CancellationToken token, string promptString = "正在下载并解压缩文件")
-        {
-            var req = HttpClientHelper.GetOnedriveReq(HttpMethod.Get, downloadUrl);
-            var resp = HttpClientHelper.httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead).Result;
-            resp.EnsureSuccessStatusCode();
-            var totalBytes = resp.Content.Headers.ContentLength;
-            Directory.CreateDirectory(destDirPath);
-            using var downloadStream = resp.Content.ReadAsStreamAsync().Result;
-
-            if (totalBytes.HasValue)
-            {
-                using var hookStream = new HookStream(downloadStream, (long)totalBytes, progress, token);
-                using var zstdStream = new DecompressionStream(hookStream);
-                using var tarStream = new TarInputStream(zstdStream, Encoding.UTF8);
-                TarEntry tarEntry;
-                var sw = Stopwatch.StartNew();
-                while ((tarEntry = tarStream.GetNextEntry()) != null)
-                {
-                    if (tarEntry.IsDirectory)
-                        continue;
-
-                    string entryName = tarEntry.Name;
-                    if (entryName.StartsWith("./"))
-                    {
-                        entryName = entryName.Substring(2);
-                    }
-
-                    // Converts the unix forward slashes in the filenames to windows backslashes
-                    entryName = entryName.Replace('/', Path.DirectorySeparatorChar);
-
-                    // Remove any root e.g. '\' because a PathRooted filename defeats Path.Combine
-                    if (Path.IsPathRooted(entryName))
-                    entryName = entryName.Substring(Path.GetPathRoot(entryName).Length);
-
-                    // 定时上报
-                    if (sw.ElapsedMilliseconds > 500)
-                    {
-                        progress.Report(($"{promptString}：{entryName}", "keep", -2));
-                        sw.Restart();
-                    }
-
-                    // Apply further name transformations here as necessary
-                    string destPath = Path.Combine(destDirPath, entryName);
-                    Directory.CreateDirectory(Path.GetDirectoryName(destPath));
-
-                    var outStream = new FileStream(destPath, FileMode.Create);
-                    tarStream.CopyEntryContents(outStream);
-                    outStream.Dispose();
-
-                    if (token.IsCancellationRequested)
-                    {
-                        throw new TaskCanceledException();
-                    }
-
-                    var myDt = DateTime.SpecifyKind(tarEntry.ModTime, DateTimeKind.Utc);
-                    File.SetLastWriteTime(destPath, myDt);
-                }
-            }
-            else
-            {
-                progress.Report(($"{promptString}...", "", -1));
-                using var hookStream = new HookStream(downloadStream, token);
-                using var zstdStream = new DecompressionStream(hookStream);
-                using var tarStream = new TarInputStream(zstdStream, Encoding.UTF8);
-                TarEntry tarEntry;
-                while ((tarEntry = tarStream.GetNextEntry()) != null)
-                {
-                    if (tarEntry.IsDirectory)
-                        continue;
-
-                    string entryName = tarEntry.Name;
-                    if (entryName.StartsWith("./"))
-                    {
-                        entryName = entryName.Substring(2);
-                    }
-
-                    // Converts the unix forward slashes in the filenames to windows backslashes
-                    entryName = entryName.Replace('/', Path.DirectorySeparatorChar);
-
-                    // Remove any root e.g. '\' because a PathRooted filename defeats Path.Combine
-                    if (Path.IsPathRooted(entryName))
-                        entryName = entryName.Substring(Path.GetPathRoot(entryName).Length);
-
-                    // Apply further name transformations here as necessary
-                    string destPath = Path.Combine(destDirPath, entryName);
-                    Directory.CreateDirectory(Path.GetDirectoryName(destPath));
-
-                    var outStream = new FileStream(destPath, FileMode.Create);
-                    tarStream.CopyEntryContents(outStream);
-                    outStream.Dispose();
-
-                    if (token.IsCancellationRequested)
-                    {
-                        throw new TaskCanceledException();
-                    }
-
-                    var myDt = DateTime.SpecifyKind(tarEntry.ModTime, DateTimeKind.Utc);
-                    File.SetLastWriteTime(destPath, myDt);
-                }
-            }
-        }
-
         public static async Task InstallMainAsync(string downloadUrl, string destDirPath, CancellationToken token)
         {
             var deProgress = new Progress<(string, string, int)>(o => WebSendMessage.SendSetProgress(o.Item1, o.Item2, o.Item3));
             var typeString = App.ResourceInstallInfo.Type == ResourceType.Game ? "游戏" : "拓展";
-            await Task.Run(() =>  DownloadExtractTask(downloadUrl, destDirPath, deProgress, token, $"正在下载并解压缩{typeString}文件"), token).ContinueWith((t) =>
+            await Task.Run(() =>  HttpClientHelper.DownloadExtractTask(downloadUrl, destDirPath, deProgress, token, $"正在下载并解压缩{typeString}文件"), token).ContinueWith((t) =>
             {
                 if (t.IsFaulted) throw t.Exception;
             }, TaskScheduler.FromCurrentSynchronizationContext());
@@ -148,7 +40,7 @@ namespace IGameInstaller.Helper
                         progress.Report(($"【{i + 1} / {depends.Length}】正在获取运行环境的下载链接: {readableString}", "", -1));
                         var dependDownloadUrl = IGameApiHelper.GetResourceDownloadUrl(dependResourceId).Result;
                         var tempDir = FileHelper.CreateRandomNameDir(Path.GetTempPath());
-                        DownloadExtractTask(dependDownloadUrl, tempDir, progress, token, $"【{i + 1} / {depends.Length}】正在下载并解压缩运行环境");
+                        HttpClientHelper.DownloadExtractTask(dependDownloadUrl, tempDir, progress, token, $"【{i + 1} / {depends.Length}】正在下载并解压缩运行环境");
                         progress.Report(($"【{i + 1} / {depends.Length}】正在安装运行环境：{readableString}...", "", -1));
                         DependHelper.Install(depend, tempDir);
                         progress.Report(($"【{i + 1} / {depends.Length}】正在清理多余文件...", "", -1));

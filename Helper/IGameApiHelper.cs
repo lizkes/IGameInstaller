@@ -117,7 +117,7 @@ namespace IGameInstaller.Helper
             var encryptedMessage = CryptoHelper.Base64Encode(CryptoHelper.AesEncrypt(errorMessage));
             var errorPayload = new IGameApiErrorPayload { AppName = App.EnglishName, Content = encryptedMessage };
             req.Content = new StringContent(errorPayload.ToJsonString(), Encoding.UTF8, "application/json");
-            var resp = await HttpClientHelper.httpClient.SendAsync(req);
+            var resp = await HttpClientHelper.httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
             await HandleApiError(resp);
         }
     }

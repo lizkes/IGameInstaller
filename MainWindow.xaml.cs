@@ -23,7 +23,7 @@ namespace IGameInstaller
 
         public MainWindow()
         {
-            Title = $"IGame安装器 v{App.Version}";
+            Title = $"IGame安装器 V{App.Version.Major}.{App.Version.Minor}.{App.Version.Build}";
             InitializeComponent();
             InitializeAsync();
         }
@@ -110,7 +110,7 @@ namespace IGameInstaller
                 }
                 catch (Exception ex)
                 {
-                    if (ex is HttpRequestException)
+                    if (ex.GetBaseException() is HttpRequestException)
                     {
                         await ProcessException("网络连接出错，请稍后重试", ex);
                         WindowHelper.EnableWindowCloseButton();
@@ -132,7 +132,7 @@ namespace IGameInstaller
                 }
                 catch (Exception ex)
                 {
-                    if (ex is HttpRequestException)
+                    if (ex.GetBaseException() is HttpRequestException)
                     {
                         await ProcessException("网络连接出错，请稍后重试", ex);
                         WindowHelper.EnableWindowCloseButton();
@@ -152,9 +152,9 @@ namespace IGameInstaller
                 } 
                 catch (Exception ex)
                 {
-                    if (ex is HttpRequestException)
+                    if (ex.GetBaseException() is HttpRequestException)
                     {
-                        await ProcessException("网络连接出错，请稍后重试", ex);
+                            await ProcessException("网络连接出错，请稍后重试", ex);
                         WindowHelper.EnableWindowCloseButton();
                         return;
                     }
@@ -164,7 +164,7 @@ namespace IGameInstaller
                 }
 
                 // check os
-                    WebSendMessage.SendSetPrompt("正在检查系统配置...");
+                WebSendMessage.SendSetPrompt("正在检查系统配置...");
                 var currentSV = SystemInfoHelper.GetCurrentSystemVersion();
                 var match = false;
                 foreach(var requireSV in App.ResourceInstallInfo.RequireSystems)
@@ -270,7 +270,15 @@ namespace IGameInstaller
                 }
                 catch (Exception ex)
                 {
-                    await ProcessException("下载引擎错误", ex);
+                    if (ex is HttpRequestException)
+                    {
+                        await ProcessException("网络连接出错，请稍后重试", ex);
+                    } 
+                    else
+                    {
+                        await ProcessException("下载引擎错误", ex);
+                    }
+
                     WindowHelper.EnableWindowCloseButton();
                     return;
                 }
@@ -307,7 +315,15 @@ namespace IGameInstaller
                 }
                 catch (Exception ex)
                 {
-                    await ProcessException("安装运行环境失败", ex);
+                    if (ex is HttpRequestException)
+                    {
+                        await ProcessException("网络连接出错，请稍后重试", ex);
+                    }
+                    else
+                    {
+                        await ProcessException("安装运行环境失败", ex);
+                    }
+
                     WindowHelper.EnableWindowCloseButton();
                     return;
                 }
@@ -397,9 +413,9 @@ namespace IGameInstaller
 
         private async Task ProcessException(string message, Exception ex)
         {
-            WebSendMessage.SendSetError(message, $"错误信息：{ex.Message}\n原始错误信息：{ex.GetBaseException().Message}");
-            Logger.Error(message + "\n错误信息：{Message}\n错误类型: {Type}\n原始错误信息：{BaseExceptionMessage}\nn原始错误类型: {BaseExceptionType}\n错误堆栈：{StackTrace}", ex.Message, ex.GetType(), ex.GetBaseException().Message, ex.GetBaseException().GetType(), ex.StackTrace);
-            await IGameApiHelper.ErrorCollect($"{message}\n错误信息：{ex.Message}\n错误类型: {ex.GetType()}\n原始错误信息：{ex.GetBaseException().Message}\n原始错误类型: {ex.GetBaseException().GetType()}\n错误堆栈：{ex.StackTrace}");
+            WebSendMessage.SendSetError(message, $"错误信息：{ex.GetBaseException().Message}");
+            Logger.Error(message + "\n错误信息：{BaseExceptionMessage}\nn错误类型: {BaseExceptionType}\n内部错误: {InnerException}\n错误堆栈：{StackTrace}", ex.GetBaseException().Message, ex.GetBaseException().GetType(), ex.InnerException, ex.StackTrace);
+            await IGameApiHelper.ErrorCollect($"{message}\n错误信息：{ex.GetBaseException().Message}\n错误类型: {ex.GetBaseException().GetType()}\n内部错误: {ex.InnerException}\n错误堆栈：{ex.StackTrace}");
         }
     }
 }
