@@ -13,6 +13,7 @@ using IGameInstaller.Model;
 using IGameInstaller.Helper;
 using IGameInstaller.Extension;
 using System.Net.Http;
+using IGameInstaller.IGameException;
 
 namespace IGameInstaller
 {
@@ -110,13 +111,6 @@ namespace IGameInstaller
                 }
                 catch (Exception ex)
                 {
-                    if (ex.GetBaseException() is HttpRequestException)
-                    {
-                        await ProcessException("网络连接出错，请稍后重试", ex);
-                        WindowHelper.EnableWindowCloseButton();
-                        return;
-                    }
-
                     await ProcessException("获取版本信息失败", ex);
                     return;
                 }
@@ -132,13 +126,6 @@ namespace IGameInstaller
                 }
                 catch (Exception ex)
                 {
-                    if (ex.GetBaseException() is HttpRequestException)
-                    {
-                        await ProcessException("网络连接出错，请稍后重试", ex);
-                        WindowHelper.EnableWindowCloseButton();
-                        return;
-                    }
-
                     await ProcessException("程序更新失败", ex);
                     return;
                 }
@@ -152,13 +139,6 @@ namespace IGameInstaller
                 } 
                 catch (Exception ex)
                 {
-                    if (ex.GetBaseException() is HttpRequestException)
-                    {
-                            await ProcessException("网络连接出错，请稍后重试", ex);
-                        WindowHelper.EnableWindowCloseButton();
-                        return;
-                    }
-
                     await ProcessException("获取资源安装配置失败", ex);
                     return;
                 }
@@ -247,38 +227,9 @@ namespace IGameInstaller
                     installCancelSource = new CancellationTokenSource();
                     await InstallHelper.InstallMainAsync(downloadUrl, App.InstallConfig.InstallPath, installCancelSource.Token);
                 }
-                catch (AggregateException ae)
-                {
-                    foreach (Exception ex in ae.InnerExceptions)
-                    {
-                        if (ex is TaskCanceledException)
-                        {
-                            WindowHelper.EnableWindowCloseButton();
-                            return;
-                        }
-
-                        if (ex is HttpRequestException)
-                        {
-                            await ProcessException("网络连接出错，请稍后重试", ex);
-                            WindowHelper.EnableWindowCloseButton();
-                            return;
-                        }
-                    }
-                    await ProcessException("下载引擎错误", ae);
-                    WindowHelper.EnableWindowCloseButton();
-                    return;
-                }
                 catch (Exception ex)
                 {
-                    if (ex is HttpRequestException)
-                    {
-                        await ProcessException("网络连接出错，请稍后重试", ex);
-                    } 
-                    else
-                    {
-                        await ProcessException("下载引擎错误", ex);
-                    }
-
+                    await ProcessException("下载引擎错误", ex);
                     WindowHelper.EnableWindowCloseButton();
                     return;
                 }
@@ -292,38 +243,9 @@ namespace IGameInstaller
                         await InstallHelper.InstallDependsAsync(App.ResourceInstallInfo.RequireDepends, installCancelSource.Token);
                     }
                 }
-                catch (AggregateException ae)
-                {
-                    foreach (Exception ex in ae.InnerExceptions)
-                    {
-                        if (ex is TaskCanceledException)
-                        {
-                            WindowHelper.EnableWindowCloseButton();
-                            return;
-                        }
-
-                        if (ex is HttpRequestException)
-                        {
-                            await ProcessException("网络连接出错，请稍后重试", ex);
-                            WindowHelper.EnableWindowCloseButton();
-                            return;
-                        }
-                    }
-                    await ProcessException("安装运行环境失败", ae);
-                    WindowHelper.EnableWindowCloseButton();
-                    return;
-                }
                 catch (Exception ex)
                 {
-                    if (ex is HttpRequestException)
-                    {
-                        await ProcessException("网络连接出错，请稍后重试", ex);
-                    }
-                    else
-                    {
-                        await ProcessException("安装运行环境失败", ex);
-                    }
-
+                    await ProcessException("安装运行环境失败", ex);
                     WindowHelper.EnableWindowCloseButton();
                     return;
                 }
@@ -337,20 +259,6 @@ namespace IGameInstaller
                         await InstallHelper.ExecuteScriptAsync(scriptPath);
                     }
                 }
-                catch (AggregateException ae)
-                {
-                    foreach (Exception ex in ae.InnerExceptions)
-                    {
-                        if (ex is TaskCanceledException)
-                        {
-                            WindowHelper.EnableWindowCloseButton();
-                            return;
-                        }
-                    }
-                    await ProcessException("脚本引擎错误", ae);
-                    WindowHelper.EnableWindowCloseButton();
-                    return;
-                }
                 catch (Exception ex)
                 {
                     await ProcessException("脚本引擎错误", ex);
@@ -362,20 +270,6 @@ namespace IGameInstaller
                 {
                     WebSendMessage.SendSetProgress("正在进行收尾工作...", "", -1);
                     await InstallHelper.FinalWork();
-                }
-                catch (AggregateException ae)
-                {
-                    foreach (Exception ex in ae.InnerExceptions)
-                    {
-                        if (ex is TaskCanceledException)
-                        {
-                            WindowHelper.EnableWindowCloseButton();
-                            return;
-                        }
-                    }
-                    await ProcessException("执行收尾工作失败", ae);
-                    WindowHelper.EnableWindowCloseButton();
-                    return;
                 }
                 catch (Exception ex)
                 {
@@ -413,9 +307,27 @@ namespace IGameInstaller
 
         private async Task ProcessException(string message, Exception ex)
         {
-            WebSendMessage.SendSetError(message, $"错误信息：{ex.GetBaseException().Message}");
-            Logger.Error(message + "\n错误信息：{BaseExceptionMessage}\nn错误类型: {BaseExceptionType}\n内部错误: {InnerException}\n错误堆栈：{StackTrace}", ex.GetBaseException().Message, ex.GetBaseException().GetType(), ex.InnerException, ex.StackTrace);
-            await IGameApiHelper.ErrorCollect($"{message}\n错误信息：{ex.GetBaseException().Message}\n错误类型: {ex.GetBaseException().GetType()}\n内部错误: {ex.InnerException}\n错误堆栈：{ex.StackTrace}");
+            var baseException = ex.GetBaseException();
+            if (baseException is TaskCanceledException)
+            {
+                WebSendMessage.SendSetError("网络连接超时，请稍后再试", $"错误信息：{baseException.Message}");
+            }
+            else if (baseException is HttpRequestException)
+            {
+                WebSendMessage.SendSetError("网络请求失败，请稍后再试", $"错误信息：{baseException.Message}");
+            }
+            else if (baseException is DownloadExtractCanceledException)
+            {
+                //如果是下载被取消，什么也不做
+                return;
+            }
+            else
+            {
+                WebSendMessage.SendSetError(message, $"错误信息：{baseException.Message}");
+            }
+
+            Logger.Error(message + "\n错误信息：{BaseExceptionMessage}\nn错误类型: {BaseExceptionType}\n内部错误: {InnerException}\n错误堆栈：{StackTrace}", baseException.Message, baseException.GetType(), ex.InnerException, ex.StackTrace);
+            await IGameApiHelper.ErrorCollect($"{message}\n错误信息：{baseException.Message}\n错误类型: {baseException.GetType()}\n内部错误: {ex.InnerException}\n错误堆栈：{ex.StackTrace}");
         }
     }
 }

@@ -8,10 +8,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Text;
 using System.Diagnostics;
+using System.Security.Authentication;
 
 using ZstdNet;
 using ICSharpCode.SharpZipLib.Tar;
 using IGameInstaller.Model;
+using IGameInstaller.IGameException;
 
 namespace IGameInstaller.Helper
 {
@@ -21,11 +23,12 @@ namespace IGameInstaller.Helper
 
         static HttpClientHelper()
         {
+
             HttpRetryMessageHandler handler = new(
                 new HttpClientHandler{
                     AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
                     MaxConnectionsPerServer = 10,
-                    SslProtocols = System.Security.Authentication.SslProtocols.Tls12,
+                    SslProtocols = SslProtocols.Tls13 | SslProtocols.Tls12 | SslProtocols.Tls11 | SslProtocols.Tls,
                     UseProxy = false,
                     Proxy = null,
                 }
@@ -39,7 +42,7 @@ namespace IGameInstaller.Helper
             var req = new HttpRequestMessage(method, url);
             req.Headers.Add("Accept", "application/json");
             req.Headers.Add("Accept-Encoding", "gzip, deflate");
-            req.Headers.Add("Agent", $"{App.EnglishName} v{App.Version}");
+            req.Headers.Add("User-Agent", $"{App.EnglishName} v{App.Version}");
             return req;
         }
 
@@ -125,7 +128,7 @@ namespace IGameInstaller.Helper
 
                     if (token.IsCancellationRequested)
                     {
-                        throw new TaskCanceledException();
+                        throw new DownloadExtractCanceledException();
                     }
 
                     var myDt = DateTime.SpecifyKind(tarEntry.ModTime, DateTimeKind.Utc);
@@ -167,7 +170,7 @@ namespace IGameInstaller.Helper
 
                     if (token.IsCancellationRequested)
                     {
-                        throw new TaskCanceledException();
+                        throw new DownloadExtractCanceledException();
                     }
 
                     var myDt = DateTime.SpecifyKind(tarEntry.ModTime, DateTimeKind.Utc);

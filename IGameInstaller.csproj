@@ -308,6 +308,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="IGameException\DownloadExtractCanceledException.cs" />
     <Compile Include="Extension\WindowExtensions.cs" />
     <Compile Include="Helper\CryptoHelper.cs" />
     <Compile Include="Helper\IGameApiHelper.cs" />
