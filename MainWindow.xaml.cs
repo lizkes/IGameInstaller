@@ -24,13 +24,16 @@ namespace IGameInstaller
 
         public MainWindow()
         {
-            Title = $"IGame安装器 V{App.Version.Major}.{App.Version.Minor}.{App.Version.Build}";
-            InitializeComponent();
-            InitializeAsync();
+                Title = $"IGame安装器 V{App.Version.Major}.{App.Version.Minor}.{App.Version.Build}";
+                InitializeComponent();
+                InitializeAsync();
         }
 
         async void InitializeAsync()
         {
+            try
+            {
+
             App.WebView = webView;
             var userDataFolder = $@"{Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)}\Infinite Dreams\IGameInstaller";
             var webView2Env = await CoreWebView2Environment.CreateAsync(null, userDataFolder);
@@ -49,7 +52,7 @@ namespace IGameInstaller
             Topmost = true;
             Topmost = false;
 #if DEBUG
-            webView.Source = new Uri("http://localhost:8500/prepare");
+                webView.Source = new Uri("http://localhost:8500/prepare");
             //var webDirPath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "web");
             //webView.CoreWebView2.SetVirtualHostNameToFolderMapping("IGameInstaller.web", webDirPath, CoreWebView2HostResourceAccessKind.Allow);
             //webView.Source = new Uri("https://IGameInstaller.web/index.html");
@@ -62,6 +65,11 @@ namespace IGameInstaller
             webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
 #endif
             webView.CoreWebView2.WebMessageReceived += ProcessMessage;
+            }
+            catch (Exception ex)
+            {
+                ProcessException("未处理错误", ex).Wait();
+            }
         }
 
         private async void ProcessMessage(object sender, CoreWebView2WebMessageReceivedEventArgs e)
@@ -332,8 +340,8 @@ namespace IGameInstaller
                 WebSendMessage.SendSetError(message, $"错误信息：{baseException.Message}");
             }
 
-            Logger.Error(message + "\n错误信息：{BaseExceptionMessage}\nn错误类型: {BaseExceptionType}\n内部错误: {InnerException}\n错误堆栈：{StackTrace}", baseException.Message, baseException.GetType(), ex.InnerException, ex.StackTrace);
-            await IGameApiHelper.ErrorCollect($"{message}\n错误信息：{baseException.Message}\n错误类型: {baseException.GetType()}\n内部错误: {ex.InnerException}\n错误堆栈：{ex.StackTrace}");
+            Logger.Error(message + "\n错误信息：{BaseExceptionMessage}\n尝试安装的资源ID: {resourceId}\nn错误类型: {BaseExceptionType}\n内部错误: {InnerException}\n错误堆栈：{StackTrace}", baseException.Message, App.ResourceInstallInfo.Id, baseException.GetType(), ex.InnerException, ex.StackTrace);
+            await IGameApiHelper.ErrorCollect($"{message}\n错误信息：{baseException.Message}\n尝试安装的资源ID: {App.ResourceInstallInfo.Id}\n错误类型: {baseException.GetType()}\n内部错误: {ex.InnerException}\n错误堆栈：{ex.StackTrace}");
         }
     }
 }

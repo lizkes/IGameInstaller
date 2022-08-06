@@ -16,6 +16,7 @@
 		VC2015to2022 = 21,
 		DirectX9 = 22,
 		ParadoxLauncher = 23,
-		ParadoxLauncherCrack = 24,
+		ParadoxLauncherZBCrack = 24,
+		ParadoxLauncherDBCrack = 42,
 	}
 }

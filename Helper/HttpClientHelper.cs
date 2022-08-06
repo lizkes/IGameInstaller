@@ -34,7 +34,7 @@ namespace IGameInstaller.Helper
                 }
             );
 
-            httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(8)};
+            httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(10)};
         }
 
         public static HttpRequestMessage GetIGameApiReq(HttpMethod method, string url)
@@ -191,7 +191,7 @@ namespace IGameInstaller.Helper
         {
             return Policy.Handle<HttpRequestException>()
                 .Or<TaskCanceledException>()
-                .WaitAndRetryAsync(5, retryAttempt => TimeSpan.FromSeconds(Math.Pow(1.2, retryAttempt)), onRetry: (exception, sleepDuration, attemptNumber, context) =>
+                .WaitAndRetryAsync(4, retryAttempt => TimeSpan.FromSeconds(Math.Pow(1.2, retryAttempt)), onRetry: (exception, sleepDuration, attemptNumber, context) =>
                 {
                     logger.Debug($"http请求失败，{sleepDuration}后重试，重试次数：{attemptNumber} / 5");
                 })

@@ -43,6 +43,7 @@ namespace IGameInstaller.Helper
     public class IGameApiErrorPayload
     {
         public string AppName { get; set; }
+        public string AppVersion { get; set; }
         public string Content { get;  set; }
         public string ToJsonString()
         {
@@ -115,7 +116,7 @@ namespace IGameInstaller.Helper
         {
             var req = HttpClientHelper.GetIGameApiReq(HttpMethod.Post, $"{IGameApiUrl}/error/collect");
             var encryptedMessage = CryptoHelper.Base64Encode(CryptoHelper.AesEncrypt(errorMessage));
-            var errorPayload = new IGameApiErrorPayload { AppName = App.EnglishName, Content = encryptedMessage };
+            var errorPayload = new IGameApiErrorPayload { AppName = App.EnglishName, AppVersion = App.Version.ToString(), Content = encryptedMessage };
             req.Content = new StringContent(errorPayload.ToJsonString(), Encoding.UTF8, "application/json");
             var resp = await HttpClientHelper.httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
             await HandleApiError(resp);

@@ -35,7 +35,8 @@ namespace IGameInstaller.Helper
                 Depend.VC2015to2022 => "Visual C++ 2015-2022",
                 Depend.DirectX9 => "DirectX 9",
                 Depend.ParadoxLauncher => "Paradox启动器",
-                Depend.ParadoxLauncherCrack => "Paradox启动器破解补丁",
+                Depend.ParadoxLauncherZBCrack => "Paradox启动器正版破解补丁",
+                Depend.ParadoxLauncherDBCrack => "Paradox启动器盗版破解补丁",
                 _ => "未知",
             };
         }
@@ -55,7 +56,8 @@ namespace IGameInstaller.Helper
                 Depend.VC2015to2022 => 21,
                 Depend.DirectX9 => 22,
                 Depend.ParadoxLauncher => 23,
-                Depend.ParadoxLauncherCrack => 24,
+                Depend.ParadoxLauncherZBCrack => 24,
+                Depend.ParadoxLauncherDBCrack => 42,
                 _ => -1,
             };
         }
@@ -65,7 +67,15 @@ namespace IGameInstaller.Helper
             var is64BitSystem = Environment.Is64BitOperatingSystem;
             switch (depend)
             {
-                case Depend.NetFramwork4_8: return (true, true);
+                case Depend.NetFramwork4_8:
+                    {
+                        object value = RegistryHelper.GetRegistry(@"SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full", "Release");
+                        if (value != null && (uint)value >= 528040)
+                        {
+                            return (false, false);
+                        }
+                        return (true, true);
+                    }
                 case Depend.VC2005:
                     {
                         var exist32bit = RegistryHelper.GetRegistry(@"SOFTWARE\Classes\Installer\Products\c1c4f01781cc94c4c8fb1542c0981a2a", "Version") != null;
@@ -98,25 +108,23 @@ namespace IGameInstaller.Helper
                     }
                 case Depend.VC2015:
                     {
-                        var (needInstall32bit, needInstall64bit) = NeedInstall(Depend.VC2015to2022);
-                        var exist32bit = RegistryHelper.GetRegistry(@"SOFTWARE\Classes\Installer\Dependencies\{e2803110-78b3-4664-a479-3611a381656a}", "Version") != null;
-                        var exist64bit = RegistryHelper.GetRegistry(@"SOFTWARE\Classes\Installer\Dependencies\{d992c12e-cab2-426f-bde3-fb8c53950b0d}", "Version") != null;
-                        return (!exist32bit && needInstall32bit, is64BitSystem && !exist64bit && needInstall64bit);
+                        var bld32bit = RegistryHelper.GetRegistry(@"SOFTWARE\Wow6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x86", "Bld");
+                        var bld64bit = RegistryHelper.GetRegistry(@"SOFTWARE\Wow6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x64", "Bld");
+                        return (bld32bit != null && (uint)bld32bit < 23026, bld64bit != null && (uint)bld64bit < 23026);
                     }
                 case Depend.VC2017:
                     {
-                        var (needInstall32bit, needInstall64bit) = NeedInstall(Depend.VC2015to2022);
-                        var exist32bit = RegistryHelper.GetRegistry(@"Installer\Dependencies\VC,redist.x86,x86,14.16,bundle", "Version", RegistryHelper.RegisterType.classesRoot) != null;
-                        var exist64bit = RegistryHelper.GetRegistry(@"Installer\Dependencies\VC,redist.x64,amd64,14.16,bundle", "Version", RegistryHelper.RegisterType.classesRoot) != null;
-                        return (!exist32bit && needInstall32bit, is64BitSystem && !exist64bit && needInstall64bit);
+                        var bld32bit = RegistryHelper.GetRegistry(@"SOFTWARE\Wow6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x86", "Bld");
+                        var bld64bit = RegistryHelper.GetRegistry(@"SOFTWARE\Wow6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x64", "Bld");
+                        return (bld32bit != null && (uint)bld32bit < 26020, bld64bit != null && (uint)bld64bit < 26020);
                     }
                 case Depend.VC2015to2022:
                     {
-                        var exist32bit = RegistryHelper.GetRegistry(@"Installer\Dependencies\VC,redist.x86,x86,14.30,bundle", "Version", RegistryHelper.RegisterType.classesRoot) != null;
-                        var exist64bit = RegistryHelper.GetRegistry(@"Installer\Dependencies\VC,redist.x64,amd64,14.30,bundle", "Version", RegistryHelper.RegisterType.classesRoot) != null;
-                        return (!exist32bit, is64BitSystem && !exist64bit);
+                        var bld32bit = RegistryHelper.GetRegistry(@"SOFTWARE\Wow6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x86", "Bld");
+                        var bld64bit = RegistryHelper.GetRegistry(@"SOFTWARE\Wow6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x64", "Bld");
+                        return (bld32bit != null && (uint)bld32bit < 30000, bld64bit != null && (uint)bld64bit < 30000);
                     }
-                case Depend.DirectX9 :
+                case Depend.DirectX9:
                     {
                         string sysDirPath = Environment.GetFolderPath(Environment.SpecialFolder.System);
                         for (int i = 24; i <= 43; i++)
@@ -137,7 +145,9 @@ namespace IGameInstaller.Helper
                         }
                         return (true, true);
                     }
-                case Depend.ParadoxLauncherCrack: return (true, true);
+                case Depend.ParadoxLauncherZBCrack:
+                case Depend.ParadoxLauncherDBCrack:
+                    return (true, true);
                 default: return(false, false);
             }
         }
@@ -148,8 +158,12 @@ namespace IGameInstaller.Helper
             {
                 case Depend.NetFramwork4_8:
                     {
-                        var exePath = Path.Combine(dependsPath, "NetFramwork4_8.exe");
-                        ProcessHelper.StartProcess(exePath, "/norestart /q");
+                        var (needInstall32bit, needInstall64bit)= NeedInstall(depend);
+                        if (needInstall32bit || needInstall64bit)
+                        {
+                            var exePath = Path.Combine(dependsPath, "NetFramwork4_8.exe");
+                            ProcessHelper.StartProcess(exePath, "/norestart /q");
+                        }
                         break;
                     }
                 case Depend.VC2005:
@@ -246,28 +260,47 @@ namespace IGameInstaller.Helper
                     }
                 case Depend.DirectX9:
                     {
-                        var exePath = Path.Combine(dependsPath, "DirectX 9", "DXSETUP.exe");
-                        ProcessHelper.StartProcess(exePath, "/silent");
+                        var (needInstall32bit, needInstall64bit) = NeedInstall(depend);
+                        if (needInstall32bit || needInstall64bit)
+                        {
+                            var exePath = Path.Combine(dependsPath, "DirectX 9", "DXSETUP.exe");
+                            ProcessHelper.StartProcess(exePath, "/silent");
+                        }
                         break;
                     }
                 case Depend.ParadoxLauncher:
                     {
-                        var exePath = Path.Combine(dependsPath, "ParadoxLauncherInstaller.msi");
-                        //ProcessHelper.StartProcess("msiexec.exe", $"/uninstall \"{exePath}\" /quiet /norestart");
-                        ProcessHelper.StartProcess("msiexec.exe", $"/i \"{exePath}\" /quiet /norestart");
+                        var (needInstall32bit, needInstall64bit) = NeedInstall(depend);
+                        if (needInstall32bit || needInstall64bit)
+                        {
+                            var exePath = Path.Combine(dependsPath, "ParadoxLauncherInstaller.msi");
+                            ProcessHelper.StartProcess("msiexec.exe", $"/i \"{exePath}\" /quiet /norestart");
+                        }
+                        else
+                        {
+                            // 卸载后重装
+                            var exePath = Path.Combine(dependsPath, "ParadoxLauncherInstaller.msi");
+                            ProcessHelper.StartProcess("msiexec.exe", $"/uninstall \"{exePath}\" /quiet /norestart");
+                            ProcessHelper.StartProcess("msiexec.exe", $"/i \"{exePath}\" /quiet /norestart");
+                        }
                         break;
                     }
-                case Depend.ParadoxLauncherCrack:
+                case Depend.ParadoxLauncherDBCrack:
+                case Depend.ParadoxLauncherZBCrack:
                     {
-                        var paradoxLauncherPath = (string)RegistryHelper.GetRegistry(@"SOFTWARE\Paradox Interactive\Paradox Launcher v2", "LauncherInstallation", RegistryHelper.RegisterType.currentUser);
-                        var launcherDir = new DirectoryInfo(paradoxLauncherPath);
-                        foreach (var childDir in launcherDir.GetDirectories())
+                        var (needInstall32bit, needInstall64bit) = NeedInstall(depend);
+                        if (needInstall32bit || needInstall64bit)
                         {
-                            string mainDirPath = Path.Combine(childDir.FullName, "resources", "app.asar.unpacked", "dist", "main");
-                            if (childDir.Name.Contains("launcher-v2") && Directory.Exists(mainDirPath))
+                            var paradoxLauncherPath = (string)RegistryHelper.GetRegistry(@"SOFTWARE\Paradox Interactive\Paradox Launcher v2", "LauncherInstallation", RegistryHelper.RegisterType.currentUser);
+                            var launcherDir = new DirectoryInfo(paradoxLauncherPath);
+                            foreach (var childDir in launcherDir.GetDirectories())
                             {
-                                var crackDirPath = Path.Combine(dependsPath, "ParadoxLauncherCrack");
-                                FileHelper.CopyFilesRecursively(crackDirPath, mainDirPath);
+                                string mainDirPath = Path.Combine(childDir.FullName, "resources", "app.asar.unpacked", "dist", "main");
+                                if (childDir.Name.Contains("launcher-v2") && Directory.Exists(mainDirPath))
+                                {
+                                    var crackDirPath = Path.Combine(dependsPath, "ParadoxLauncherCrack");
+                                    FileHelper.CopyFilesRecursively(crackDirPath, mainDirPath);
+                                }
                             }
                         }
                         break;
